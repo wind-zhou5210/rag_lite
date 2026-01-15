@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}关于 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>关于 {{ app_name }}</h1>
+</div>
+
+<div class="about-content">
+    <section class="about-section">
+        <h2>什么是 RAG？</h2>
+        <p>RAG（Retrieval-Augmented Generation，检索增强生成）是一种结合了信息检索和文本生成的人工智能技术。它通过在生成回答之前先从知识库中检索相关信息，从而提供更准确、更有依据的答案。</p>
+    </section>
+
+    <section class="about-section">
+        <h2>技术栈</h2>
+        <ul class="tech-list">
+            <li><strong>Flask</strong> - 轻量级 Python Web 框架</li>
+            <li><strong>SQLAlchemy</strong> - Python SQL 工具包和 ORM</li>
+            <li><strong>MySQL</strong> - 关系型数据库</li>
+            <li><strong>Jinja2</strong> - 模板引擎</li>
+        </ul>
+    </section>
+
+    <section class="about-section">
+        <h2>主要功能</h2>
+        <ul>
+            <li>文档上传与管理</li>
+            <li>文档内容索引</li>
+            <li>语义检索</li>
+            <li>智能问答</li>
+        </ul>
+    </section>
+
+    <section class="about-section">
+        <h2>版本信息</h2>
+        <p>当前版本: v{{ app_version }}</p>
+    </section>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+# Python-generated files
+__pycache__/
+__pycache__/*
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+venv/
+env/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Flask
+instance/
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/
+
+# Uploads
+uploads/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/

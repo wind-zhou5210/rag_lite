@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}文档管理 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>文档管理</h1>
+    <p>管理您的知识库文档</p>
+</div>
+
+<div class="toolbar">
+    <button id="addDocBtn" class="btn btn-primary">+ 添加文档</button>
+    <input type="text" id="searchInput" class="search-input" placeholder="搜索文档...">
+</div>
+
+<div id="documentList" class="document-list">
+    <div class="loading">加载中...</div>
+</div>
+
+<!-- 添加/编辑文档模态框 -->
+<div id="documentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalTitle">添加文档</h2>
+            <button class="close" onclick="closeModal()">&times;</button>
+        </div>
+        <form id="documentForm">
+            <input type="hidden" id="docId">
+            <div class="form-group">
+                <label for="docTitle">标题</label>
+                <input type="text" id="docTitle" required>
+            </div>
+            <div class="form-group">
+                <label for="docContent">内容</label>
+                <textarea id="docContent" rows="10" required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="docType">文件类型</label>
+                <select id="docType">
+                    <option value="">选择类型</option>
+                    <option value="txt">TXT</option>
+                    <option value="pdf">PDF</option>
+                    <option value="docx">DOCX</option>
+                    <option value="md">Markdown</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">取消</button>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 文档管理 JavaScript
+const API_BASE = '/api';
+
+// 加载文档列表
+async function loadDocuments() {
+    const container = document.getElementById('documentList');
+    try {
+        const response = await fetch(`${API_BASE}/documents`);
+        const data = await response.json();
+        
+        if (data.documents.length === 0) {
+            container.innerHTML = '<p class="empty-state">暂无文档，点击"添加文档"开始吧！</p>';
+            return;
+        }
+        
+        container.innerHTML = data.documents.map(doc => `
+            <div class="document-card" data-id="${doc.id}">
+                <h3>${escapeHtml(doc.title)}</h3>
+                <p class="document-preview">${escapeHtml(doc.content.substring(0, 200))}...</p>
+                <div class="document-meta">
+                    <span class="file-type">${doc.file_type || '未知'}</span>
+                    <span class="date">${formatDate(doc.created_at)}</span>
+                </div>
+                <div class="document-actions">
+                    <button class="btn btn-sm" onclick="editDocument(${doc.id})">编辑</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteDocument(${doc.id})">删除</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        container.innerHTML = '<p class="error">加载失败，请稍后重试</p>';
+        console.error('Error loading documents:', error);
+    }
+}
+
+// 显示模态框
+function showModal(title = '添加文档') {
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('documentModal').classList.add('active');
+}
+
+// 关闭模态框
+function closeModal() {
+    document.getElementById('documentModal').classList.remove('active');
+    document.getElementById('documentForm').reset();
+    document.getElementById('docId').value = '';
+}
+
+// 添加文档按钮
+document.getElementById('addDocBtn').addEventListener('click', () => showModal());
+
+// 表单提交
+document.getElementById('documentForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const docId = document.getElementById('docId').value;
+    const data = {
+        title: document.getElementById('docTitle').value,
+        content: document.getElementById('docContent').value,
+        file_type: document.getElementById('docType').value
+    };
+    
+    try {
+        const url = docId ? `${API_BASE}/documents/${docId}` : `${API_BASE}/documents`;
+        const method = docId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            closeModal();
+            loadDocuments();
+        } else {
+            const error = await response.json();
+            alert(error.error || '保存失败');
+        }
+    } catch (error) {
+        console.error('Error saving document:', error);
+        alert('保存失败，请稍后重试');
+    }
+});
+
+// 编辑文档
+async function editDocument(id) {
+    try {
+        const response = await fetch(`${API_BASE}/documents/${id}`);
+        const doc = await response.json();
+        
+        document.getElementById('docId').value = doc.id;
+        document.getElementById('docTitle').value = doc.title;
+        document.getElementById('docContent').value = doc.content;
+        document.getElementById('docType').value = doc.file_type || '';
+        
+        showModal('编辑文档');
+    } catch (error) {
+        console.error('Error loading document:', error);
+        alert('加载文档失败');
+    }
+}
+
+// 删除文档
+async function deleteDocument(id) {
+    if (!confirm('确定要删除这个文档吗？')) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/documents/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+            loadDocuments();
+        } else {
+            alert('删除失败');
+        }
+    } catch (error) {
+        console.error('Error deleting document:', error);
+        alert('删除失败，请稍后重试');
+    }
+}
+
+// 工具函数
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatDate(dateStr) {
+    return new Date(dateStr).toLocaleDateString('zh-CN');
+}
+
+// 页面加载时获取文档列表
+document.addEventListener('DOMContentLoaded', loadDocuments);
+</script>
+{% endblock %}

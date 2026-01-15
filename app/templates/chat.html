@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}智能问答 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>智能问答</h1>
+    <p>基于您的知识库进行智能问答</p>
+</div>
+
+<div class="chat-container">
+    <div id="chatMessages" class="chat-messages">
+        <div class="message system">
+            <p>欢迎使用 RAG Lite 智能问答系统！请输入您的问题。</p>
+        </div>
+    </div>
+    
+    <form id="chatForm" class="chat-input-form">
+        <input type="text" id="questionInput" placeholder="输入您的问题..." autocomplete="off" required>
+        <button type="submit" class="btn btn-primary">发送</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const chatMessages = document.getElementById('chatMessages');
+const chatForm = document.getElementById('chatForm');
+const questionInput = document.getElementById('questionInput');
+
+// 添加消息到聊天界面
+function addMessage(content, type = 'user', sources = []) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${type}`;
+    
+    let html = `<p>${escapeHtml(content)}</p>`;
+    
+    if (sources && sources.length > 0) {
+        html += '<div class="sources"><strong>参考来源:</strong><ul>';
+        sources.forEach(source => {
+            html += `<li>${escapeHtml(source)}</li>`;
+        });
+        html += '</ul></div>';
+    }
+    
+    messageDiv.innerHTML = html;
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// 发送问题
+chatForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const question = questionInput.value.trim();
+    if (!question) return;
+    
+    // 显示用户问题
+    addMessage(question, 'user');
+    questionInput.value = '';
+    
+    // 显示加载状态
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'message assistant loading';
+    loadingDiv.innerHTML = '<p>思考中...</p>';
+    chatMessages.appendChild(loadingDiv);
+    
+    try {
+        const response = await fetch('/api/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question })
+        });
+        
+        const data = await response.json();
+        
+        // 移除加载状态
+        loadingDiv.remove();
+        
+        if (response.ok) {
+            addMessage(data.answer, 'assistant', data.sources);
+        } else {
+            addMessage(data.error || '抱歉，处理您的问题时出现了错误。', 'error');
+        }
+    } catch (error) {
+        loadingDiv.remove();
+        addMessage('网络错误，请稍后重试。', 'error');
+        console.error('Error:', error);
+    }
+});
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}

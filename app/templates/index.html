@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}首页 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>欢迎使用 {{ app_name }}</h1>
+    <p class="lead">一个轻量级的检索增强生成（RAG）系统</p>
+    <p>基于 Flask + SQLAlchemy + MySQL + Jinja2 构建</p>
+</div>
+
+<div class="features">
+    <div class="feature-card">
+        <h3>📄 文档管理</h3>
+        <p>轻松上传和管理您的知识文档，支持多种文件格式</p>
+        <a href="{{ url_for('main.documents') }}" class="btn btn-primary">管理文档</a>
+    </div>
+    
+    <div class="feature-card">
+        <h3>💬 智能问答</h3>
+        <p>基于您的文档进行智能问答，获取精准的答案</p>
+        <a href="{{ url_for('main.chat') }}" class="btn btn-primary">开始对话</a>
+    </div>
+    
+    <div class="feature-card">
+        <h3>🔍 语义检索</h3>
+        <p>先进的语义搜索技术，理解您问题的真正含义</p>
+        <a href="{{ url_for('main.about') }}" class="btn btn-secondary">了解更多</a>
+    </div>
+</div>
+
+<div class="quick-start">
+    <h2>快速开始</h2>
+    <ol>
+        <li>上传您的知识文档（PDF、TXT、DOCX 等）</li>
+        <li>系统自动处理并建立索引</li>
+        <li>在智能问答页面提问</li>
+        <li>获取基于您文档的精准回答</li>
+    </ol>
+</div>
+{% endblock %}
