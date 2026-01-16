@@ -66,11 +66,12 @@ def register_blueprints(app):
     Args:
         app: Flask 应用实例
     """
-    from app.routes import main_bp, api_bp, auth_bp
+    from app.routes import main_bp, api_bp, auth_bp, kb_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    app.register_blueprint(kb_bp, url_prefix='/api/kb')
 
 
 def register_context_processors(app):
