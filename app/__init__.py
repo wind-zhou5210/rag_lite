@@ -6,50 +6,57 @@ Flask 应用工厂模块
 
 import os
 from flask import Flask
+from flask_cors import CORS
 
 from app.config import Config
 from app.util.logger import get_logger
 from app.util.db import init_db, create_tables
 
 
-def create_app(config_class=Config):
+def configure_cors(app):
+    """
+    配置 CORS 跨域访问
 
-   # 获取名为当前模块的日志记录器（在函数内部获取，避免模块导入时过早初始化）
-    logger = get_logger(__name__)
+    Args:
+        app: Flask 应用实例
+    """
+    # 开发环境允许的源
+    allowed_origins = [
+        "http://localhost:5173",      # Vite 默认端口
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",      # 备用端口
+        "http://127.0.0.1:3000",
+    ]
 
-    try:
-        logger.info("初始化数据库...")
-        init_db()
-        create_tables()
-        logger.info("初始化数据库成功")
-    except Exception as e:
-        logger.warning(f"数据库初始化失败: {e}")
-    # 创建 Flask 应用对象，并指定模板和静态文件目录
-    base_dir = os.path.abspath(os.path.dirname(__file__))
-    # 创建 Flask 应用实例
-    app = Flask(
-        __name__,
-        template_folder=os.path.join(base_dir, 'templates'),
-        # 指定静态文件目录
-        static_folder=os.path.join(base_dir, 'static')
+    # 生产环境可从配置读取
+    # if app.config.get('CORS_ORIGINS'):
+    #     allowed_origins = app.config['CORS_ORIGINS']
+
+    CORS(
+        app,
+        # 允许的源（不要使用 "*"，尤其是当 supports_credentials=True 时）
+        origins=allowed_origins,
+        # 允许的 HTTP 方法
+        methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        # 允许的请求头
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "X-Requested-With",
+            "Accept",
+        ],
+        # 允许响应头暴露给前端
+        expose_headers=[
+            "Content-Type",
+            "X-Total-Count",  # 分页总数等自定义头
+        ],
+        # 是否允许携带凭证（Cookie/Authorization）
+        # 当前方案使用 Bearer Token，设为 False 即可
+        # 如果改用 HTTP Only Cookie，需要设为 True
+        supports_credentials=False,
+        # 预检请求缓存时间（秒）
+        max_age=600,
     )
-
-    # 加载配置
-    app.config.from_object(config_class)
-
-
-    # 注册蓝图
-    register_blueprints(app)
-
-    # 注册上下文处理器
-    register_context_processors(app)
-    @app.route('/')
-    def index():
-        return "Hello, World!"
-
-    # 记录应用创建日志信息
-    logger.info("Flask 应用已创建")
-    return app
 
 
 def register_blueprints(app):
@@ -59,11 +66,11 @@ def register_blueprints(app):
     Args:
         app: Flask 应用实例
     """
-    from app.routes import main_bp, api_bp
-
+    from app.routes import main_bp, api_bp, auth_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
 
 
 def register_context_processors(app):
@@ -80,3 +87,54 @@ def register_context_processors(app):
             'app_name': 'RAG Lite',
             'app_version': '0.1.0'
         }
+
+
+def create_app(config_class=Config):
+    """
+    应用工厂函数
+
+    Args:
+        config_class: 配置类
+
+    Returns:
+        Flask 应用实例
+    """
+    # 获取日志记录器
+    logger = get_logger(__name__)
+
+    # 初始化数据库
+    try:
+        logger.info("初始化数据库...")
+        init_db()
+        create_tables()
+        logger.info("初始化数据库成功")
+    except Exception as e:
+        logger.warning(f"数据库初始化失败: {e}")
+
+    # 创建 Flask 应用对象
+    base_dir = os.path.abspath(os.path.dirname(__file__))
+    app = Flask(
+        __name__,
+        template_folder=os.path.join(base_dir, 'templates'),
+        static_folder=os.path.join(base_dir, 'static')
+    )
+
+    # 加载配置
+    app.config.from_object(config_class)
+
+    # 配置 CORS 跨域
+    configure_cors(app)
+
+    # 注册蓝图
+    register_blueprints(app)
+
+    # 注册上下文处理器
+    register_context_processors(app)
+
+    # 首页路由
+    @app.route('/')
+    def index():
+        return "Hello, World!"
+
+    logger.info("Flask 应用已创建")
+    return app

@@ -3291,6 +3291,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pyjwt"
+version = "2.10.1"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/e7/46/bd74733ff231675599650d3e47f361794b22ef3e3770998dda30d3b63726/pyjwt-2.10.1.tar.gz", hash = "sha256:3cc5772eb20009233caf06e9d8a0577824723b44e6648ee0a2aedb6cf9381953", size = 87785, upload-time = "2024-11-28T03:43:29.933Z" }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/61/ad/689f02752eeec26aed679477e80e632ef1b682313be70793d798c1d5fc8f/PyJWT-2.10.1-py3-none-any.whl", hash = "sha256:dcdd193e30abefd5debf142f9adfcdd2b58004e644f25406ffaebd50bd98dacb", size = 22997, upload-time = "2024-11-28T03:43:27.893Z" },
+]
+
+[[package]]
 name = "pymilvus"
 version = "2.6.6"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
@@ -3483,6 +3492,7 @@ name = "rag-lite"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "bcrypt" },
     { name = "cryptography" },
     { name = "docx2txt" },
     { name = "flask" },
@@ -3496,6 +3506,7 @@ dependencies = [
     { name = "langchain-milvus" },
     { name = "langchain-openai" },
     { name = "minio" },
+    { name = "pyjwt" },
     { name = "pymysql" },
     { name = "pypdf" },
     { name = "python-dotenv" },
@@ -3511,6 +3522,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "bcrypt", specifier = ">=4.1.0" },
     { name = "cryptography", specifier = ">=41.0.0" },
     { name = "docx2txt", specifier = ">=0.9" },
     { name = "flask", specifier = ">=3.0.0" },
@@ -3524,6 +3536,7 @@ requires-dist = [
     { name = "langchain-milvus", specifier = ">=0.3.3" },
     { name = "langchain-openai", specifier = ">=1.1.7" },
     { name = "minio", specifier = ">=7.2.20" },
+    { name = "pyjwt", specifier = ">=2.8.0" },
     { name = "pymysql", specifier = ">=1.1.0" },
     { name = "pypdf", specifier = ">=6.6.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
