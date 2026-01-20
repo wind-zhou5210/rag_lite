@@ -239,3 +239,154 @@ def sanitize_filename(filename: str) -> str:
         name = 'unnamed'
     
     return name + ext.lower()
+
+
+# ==================== 文档文件校验 ====================
+
+# 文档类型的 MIME 类型映射
+DOCUMENT_MIME_TYPES = {
+    'pdf': {'application/pdf'},
+    'docx': {'application/vnd.openxmlformats-officedocument.wordprocessingml.document'},
+    'txt': {'text/plain'},
+    'md': {'text/plain', 'text/markdown', 'text/x-markdown'},
+}
+
+# 文档类型的 Magic Number 签名
+DOCUMENT_SIGNATURES = {
+    # PDF: %PDF
+    b'%PDF': {'pdf'},
+    # DOCX (ZIP 格式): PK
+    b'PK\x03\x04': {'docx'},
+    b'PK\x05\x06': {'docx'},
+    b'PK\x07\x08': {'docx'},
+}
+
+
+def validate_document_extension(filename: str) -> Tuple[bool, Optional[str], Optional[str]]:
+    """
+    校验文档文件扩展名
+    
+    Args:
+        filename: 文件名
+    
+    Returns:
+        (is_valid, error_message, file_type)
+    """
+    if not filename:
+        return False, "文件名不能为空", None
+    
+    # 获取扩展名（去掉点号，转小写）
+    ext = os.path.splitext(filename)[1].lower().lstrip('.')
+    
+    if not ext:
+        return False, "文件没有扩展名", None
+    
+    allowed_extensions = Config.ALLOWED_EXTENSIONS
+    if ext not in allowed_extensions:
+        return False, f"不支持的文档格式: .{ext}，允许的格式: {', '.join('.' + e for e in allowed_extensions)}", None
+    
+    return True, None, ext
+
+
+def validate_document_size(file_size: int) -> Tuple[bool, Optional[str]]:
+    """
+    校验文档文件大小
+    
+    Args:
+        file_size: 文件大小（字节）
+    
+    Returns:
+        (is_valid, error_message)
+    """
+    max_size = Config.MAX_FILE_SIZE
+    
+    if file_size <= 0:
+        return False, "文件大小无效"
+    
+    if file_size > max_size:
+        max_size_mb = max_size / (1024 * 1024)
+        file_size_mb = file_size / (1024 * 1024)
+        return False, f"文件大小超过限制: {file_size_mb:.2f}MB，最大允许: {max_size_mb:.1f}MB"
+    
+    return True, None
+
+
+def validate_document_content(file_data: bytes, expected_type: str) -> Tuple[bool, Optional[str]]:
+    """
+    基于文件内容（Magic Number）校验文档真实类型
+    
+    Args:
+        file_data: 文件头部数据
+        expected_type: 期望的文件类型
+    
+    Returns:
+        (is_valid, error_message)
+    """
+    if not file_data or len(file_data) < 4:
+        return False, "文件内容为空或过短"
+    
+    # txt 和 md 是纯文本，不做 Magic Number 校验
+    if expected_type in ('txt', 'md'):
+        return True, None
+    
+    # PDF: %PDF
+    if expected_type == 'pdf':
+        if file_data[:4] == b'%PDF':
+            return True, None
+        return False, "文件内容不是有效的 PDF 格式"
+    
+    # DOCX (ZIP 格式): PK
+    if expected_type == 'docx':
+        if file_data[:2] == b'PK':
+            return True, None
+        return False, "文件内容不是有效的 DOCX 格式"
+    
+    return True, None
+
+
+def validate_document_file(
+    file: FileStorage,
+    check_content: bool = True
+) -> Tuple[bool, Optional[str], Optional[int], Optional[str]]:
+    """
+    综合校验文档文件
+    
+    Args:
+        file: Werkzeug FileStorage 对象
+        check_content: 是否检查文件内容（Magic Number）
+    
+    Returns:
+        (is_valid, error_message, file_size, file_type)
+    """
+    if not file or not file.filename:
+        return False, "请选择要上传的文件", None, None
+    
+    filename = file.filename
+    
+    logger.debug(f"开始校验文档: {filename}")
+    
+    # 1. 校验扩展名
+    valid, error, file_type = validate_document_extension(filename)
+    if not valid:
+        return False, error, None, None
+    
+    # 2. 读取文件内容并校验大小
+    file.seek(0, 2)  # 移到文件末尾
+    file_size = file.tell()  # 获取文件大小
+    file.seek(0)  # 重置到文件开头
+    
+    valid, error = validate_document_size(file_size)
+    if not valid:
+        return False, error, file_size, file_type
+    
+    # 3. 校验文件内容（Magic Number）
+    if check_content:
+        header = file.read(16)
+        file.seek(0)  # 重置到文件开头
+        
+        valid, error = validate_document_content(header, file_type)
+        if not valid:
+            return False, error, file_size, file_type
+    
+    logger.debug(f"文档校验通过: {filename}, 大小: {file_size} bytes, 类型: {file_type}")
+    return True, None, file_size, file_type

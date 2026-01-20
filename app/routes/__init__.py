@@ -10,5 +10,6 @@ from app.routes.auth import auth_bp
 from app.routes.knowledgebase import kb_bp
 from app.routes.upload import upload_bp
 from app.routes.settings import settings_bp
+from app.routes.document import doc_bp
 
-__all__ = ['main_bp', 'api_bp', 'auth_bp', 'kb_bp', 'upload_bp', 'settings_bp']
+__all__ = ['main_bp', 'api_bp', 'auth_bp', 'kb_bp', 'upload_bp', 'settings_bp', 'doc_bp']
