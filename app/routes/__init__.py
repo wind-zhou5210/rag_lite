@@ -8,5 +8,6 @@ from app.routes.main import main_bp
 from app.routes.api import api_bp
 from app.routes.auth import auth_bp
 from app.routes.knowledgebase import kb_bp
+from app.routes.upload import upload_bp
 
-__all__ = ['main_bp', 'api_bp', 'auth_bp', 'kb_bp']
+__all__ = ['main_bp', 'api_bp', 'auth_bp', 'kb_bp', 'upload_bp']

@@ -48,9 +48,26 @@ class Config:
     LOG_ENABLE_FILE = os.environ.get(
         'LOG_ENABLE_FILE', 'true').lower() == 'true'
 
-    DB_HOST = os.environ.get("DB_HOST", "8.140.248.163")  # 数据库主机
+    DB_HOST = os.environ.get("DB_HOST", "localhost")  # 数据库主机
     DB_PORT = os.environ.get("DB_PORT", 3306)  # 数据库端口
     DB_USER = os.environ.get("DB_USER", "root")  # 数据库用户
-    DB_PASSWORD = os.environ.get("DB_PASSWORD", "521@Ab15933186716")  # 数据库密码
+    DB_PASSWORD = os.environ.get("DB_PASSWORD", "")  # 数据库密码（请通过环境变量配置）
     DB_NAME = os.environ.get("DB_NAME", "rag-lite")  # 数据库名
     DB_CHARSET = os.environ.get("DB_CHARSET", "utf8mb4")
+
+    # 存储配置
+    STORAGE_TYPE = os.environ.get('STORAGE_TYPE', 'local')  # 'local' or 'minio'
+
+    # 本地存储配置
+    LOCAL_UPLOAD_DIR = os.environ.get('LOCAL_UPLOAD_DIR', './uploads')
+
+    # MinIO 配置
+    MINIO_ENDPOINT = os.environ.get('MINIO_ENDPOINT', 'localhost:9000')
+    MINIO_ACCESS_KEY = os.environ.get('MINIO_ACCESS_KEY', '')
+    MINIO_SECRET_KEY = os.environ.get('MINIO_SECRET_KEY', '')
+    MINIO_BUCKET = os.environ.get('MINIO_BUCKET', 'rag-lite')
+    MINIO_SECURE = os.environ.get('MINIO_SECURE', 'false').lower() == 'true'
+
+    # 图片上传配置
+    MAX_IMAGE_SIZE = int(os.environ.get('MAX_IMAGE_SIZE', 5242880))  # 5MB
+    ALLOWED_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}

@@ -16,8 +16,67 @@ from app.util.logger import get_logger
 logger = get_logger(__name__)
 
 
+def _get_storage_provider():
+    """延迟加载存储提供者，避免循环导入"""
+    from app.services.storage import get_storage_provider
+    return get_storage_provider()
+
+
 class KnowledgebaseService:
     """知识库服务类"""
+
+    def _convert_cover_url(self, kb_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        将 cover_image（object_key）转换为可访问的 URL
+        
+        Args:
+            kb_dict: 知识库字典数据
+        
+        Returns:
+            添加了 cover_image_url 字段的字典
+        """
+        if kb_dict.get('cover_image'):
+            try:
+                storage = _get_storage_provider()
+                kb_dict['cover_image_url'] = storage.get_url(kb_dict['cover_image'])
+            except Exception as e:
+                logger.warning(f"获取封面图片 URL 失败: {e}")
+                kb_dict['cover_image_url'] = None
+        else:
+            kb_dict['cover_image_url'] = None
+        return kb_dict
+    
+    def _convert_cover_url_list(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        批量转换列表中的 cover_image URL
+        
+        Args:
+            items: 知识库字典列表
+        
+        Returns:
+            转换后的列表
+        """
+        return [self._convert_cover_url(item) for item in items]
+    
+    def _delete_cover_image(self, object_key: Optional[str]) -> None:
+        """
+        删除封面图片
+        
+        Args:
+            object_key: 图片的 object_key
+        """
+        if not object_key:
+            return
+        
+        try:
+            storage = _get_storage_provider()
+            success, error = storage.delete(object_key)
+            if success:
+                logger.info(f"封面图片删除成功: {object_key}")
+            else:
+                logger.warning(f"封面图片删除失败: {error}")
+        except Exception as e:
+            logger.warning(f"删除封面图片异常: {e}")
 
     def create(
         self,
@@ -57,6 +116,8 @@ class KnowledgebaseService:
                 session.flush()  # 获取生成的 ID
                 # 在 session 内部转换为字典，避免 detached 问题
                 kb_dict = kb.to_dict()
+                # 转换封面图片 URL
+                kb_dict = self._convert_cover_url(kb_dict)
                 logger.info(f"知识库 {name} 创建成功，ID: {kb.id}")
                 return kb_dict, None
 
@@ -102,7 +163,10 @@ class KnowledgebaseService:
                 if not kb:
                     return None, "知识库不存在或无权访问"
 
-                return kb.to_dict(), None
+                kb_dict = kb.to_dict()
+                # 转换封面图片 URL
+                kb_dict = self._convert_cover_url(kb_dict)
+                return kb_dict, None
 
         except Exception as e:
             logger.error(f"查询知识库失败: {e}")
@@ -144,6 +208,8 @@ class KnowledgebaseService:
 
                 # 转换为字典列表
                 items = [kb.to_dict() for kb in kbs]
+                # 转换封面图片 URL
+                items = self._convert_cover_url_list(items)
 
                 result = {
                     "items": items,
@@ -183,6 +249,10 @@ class KnowledgebaseService:
         if not update_data:
             return None, "没有有效的更新字段"
 
+        # 用于记录需要在事务成功后删除的图片
+        image_to_delete = None
+        kb_dict = None
+
         try:
             with session_scope() as session:
                 # 查询并验证权限
@@ -200,15 +270,35 @@ class KnowledgebaseService:
                 if new_chunk_overlap >= new_chunk_size:
                     return None, "分块重叠大小不能大于等于分块大小"
 
+                # 检查是否更换了封面图片
+                old_cover_image = kb.cover_image
+                new_cover_image = update_data.get("cover_image")
+                cover_image_changed = (
+                    "cover_image" in update_data and 
+                    old_cover_image and 
+                    new_cover_image != old_cover_image
+                )
+
                 # 更新字段
                 for key, value in update_data.items():
                     setattr(kb, key, value)
 
                 session.flush()
                 kb_dict = kb.to_dict()
+                # 转换封面图片 URL
+                kb_dict = self._convert_cover_url(kb_dict)
+
+                # 如果更换了封面，记录待删除的旧图片
+                if cover_image_changed:
+                    image_to_delete = old_cover_image
 
                 logger.info(f"知识库 {kb_id} 更新成功")
-                return kb_dict, None
+            
+            # 事务提交成功后，删除旧图片（在 session_scope 外部执行）
+            if image_to_delete:
+                self._delete_cover_image(image_to_delete)
+            
+            return kb_dict, None
 
         except IntegrityError as e:
             error_msg = str(e.orig) if hasattr(e, "orig") else str(e)
@@ -238,6 +328,10 @@ class KnowledgebaseService:
         Returns:
             (是否成功, 错误信息)
         """
+        # 用于记录需要在事务成功后删除的图片
+        image_to_delete = None
+        kb_name = None
+        
         try:
             with session_scope() as session:
                 # 查询并验证权限
@@ -250,10 +344,16 @@ class KnowledgebaseService:
                     return False, "知识库不存在或无权操作"
 
                 kb_name = kb.name
+                image_to_delete = kb.cover_image
                 session.delete(kb)
 
                 logger.info(f"知识库 {kb_name}({kb_id}) 删除成功")
-                return True, None
+            
+            # 事务提交成功后，删除关联的封面图片（在 session_scope 外部执行）
+            if image_to_delete:
+                self._delete_cover_image(image_to_delete)
+            
+            return True, None
 
         except Exception as e:
             logger.error(f"删除知识库异常: {e}")
