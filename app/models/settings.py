@@ -42,12 +42,12 @@ class Settings(BaseModel):
     rag_query_prompt = Column(Text, nullable=True)
 
     # 检索设置
-    # 检索模式 可选值 vector(向量检索就是常说的稠密检索) keyword(关键字检索就是常说的稀疏检索) hybird(混合检索)
+    # 检索模式 可选值 vector(向量检索就是常说的稠密检索) keyword(关键字检索就是常说的稀疏检索) hybrid(混合检索)
     retrieval_mode = Column(
         String(32),
         nullable=False,
         default="vector",
-        comment="检索模型：vector(向量检索) keyword(关键字检索) hybird(混合检索)",
+        comment="检索模型：vector(向量检索) keyword(关键字检索) hybrid(混合检索)",
     )
     # 向量检索阈值
     vector_threshold = Column(Float, nullable=True, default=0.2, comment="向量检索阈值")
