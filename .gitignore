@@ -35,6 +35,9 @@ logs/
 # Uploads
 uploads/
 
+# Vector store data
+data/
+
 # Testing
 .pytest_cache/
 .coverage
