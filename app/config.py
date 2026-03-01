@@ -71,3 +71,13 @@ class Config:
     # 图片上传配置
     MAX_IMAGE_SIZE = int(os.environ.get('MAX_IMAGE_SIZE', 5242880))  # 5MB
     ALLOWED_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+
+    # 向量存储配置
+    VECTOR_STORE_TYPE = os.environ.get('VECTOR_STORE_TYPE', 'chroma')  # 'chroma' or 'milvus'
+
+    # Chroma 配置
+    CHROMA_PERSIST_DIR = os.environ.get('CHROMA_PERSIST_DIR', './data/chroma')
+
+    # Milvus 配置
+    MILVUS_HOST = os.environ.get('MILVUS_HOST', 'localhost')
+    MILVUS_PORT = os.environ.get('MILVUS_PORT', '19530')

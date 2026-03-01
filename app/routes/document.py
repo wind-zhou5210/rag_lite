@@ -1,13 +1,14 @@
 """
 文档路由模块
 
-提供文档的上传、查询、删除等 API 接口
+提供文档的上传、查询、删除、处理等 API 接口
 """
 
 from flask import Blueprint, request
 
 from app.services.document_service import doc_service
 from app.services.storage import get_storage_provider
+from app.services.document_processor import document_processor
 from app.util.auth import login_required, get_current_user_id
 from app.util.response import success, bad_request, not_found, server_error
 from app.util.file_validator import validate_document_file, sanitize_filename
@@ -252,3 +253,113 @@ def delete_document(kb_id, doc_id):
     logger.info(f"用户 {user_id} 删除文档: {doc_id}")
 
     return success(message="删除成功")
+
+
+@doc_bp.route("/<kb_id>/documents/<doc_id>/process", methods=["POST"])
+@login_required
+def process_document(kb_id, doc_id):
+    """
+    处理文档
+
+    将文档进行解析、分块、向量化并存储到向量数据库。
+
+    Path Params:
+        kb_id: 知识库 ID
+        doc_id: 文档 ID
+
+    Response:
+        成功: { "code": 200, "data": { "id": "xxx", "status": "processing" }, "message": "处理任务已提交" }
+        失败: { "code": 400/404, "message": "错误信息" }
+    """
+    # 校验 ID 格式
+    if not is_valid_id(kb_id) or not is_valid_id(doc_id):
+        return bad_request("无效的 ID 格式")
+
+    # 获取当前用户 ID
+    user_id = get_current_user_id()
+
+    # 先验证文档存在
+    doc_data, error = doc_service.get_by_id(
+        kb_id=kb_id,
+        doc_id=doc_id,
+        user_id=user_id
+    )
+
+    if error:
+        return not_found(error)
+
+    # 检查文档状态
+    if doc_data.get('status') == 'processing':
+        return bad_request("文档正在处理中，请稍候")
+
+    # 提交处理任务
+    success_flag, error = document_processor.submit_process_task(
+        kb_id=kb_id,
+        doc_id=doc_id,
+        user_id=user_id
+    )
+
+    if not success_flag:
+        return server_error(error)
+
+    logger.info(f"用户 {user_id} 提交文档处理任务: {doc_id}")
+
+    return success(
+        data={"id": doc_id, "status": "processing"},
+        message="处理任务已提交"
+    )
+
+
+@doc_bp.route("/<kb_id>/documents/<doc_id>/reprocess", methods=["POST"])
+@login_required
+def reprocess_document(kb_id, doc_id):
+    """
+    重新处理文档
+
+    删除旧的向量数据，重新进行文档解析、分块、向量化并存储。
+
+    Path Params:
+        kb_id: 知识库 ID
+        doc_id: 文档 ID
+
+    Response:
+        成功: { "code": 200, "data": { "id": "xxx", "status": "processing" }, "message": "重处理任务已提交" }
+        失败: { "code": 400/404, "message": "错误信息" }
+    """
+    # 校验 ID 格式
+    if not is_valid_id(kb_id) or not is_valid_id(doc_id):
+        return bad_request("无效的 ID 格式")
+
+    # 获取当前用户 ID
+    user_id = get_current_user_id()
+
+    # 先验证文档存在
+    doc_data, error = doc_service.get_by_id(
+        kb_id=kb_id,
+        doc_id=doc_id,
+        user_id=user_id
+    )
+
+    if error:
+        return not_found(error)
+
+    # 检查文档状态
+    if doc_data.get('status') == 'processing':
+        return bad_request("文档正在处理中，请稍候")
+
+    # 提交重处理任务
+    success_flag, error = document_processor.submit_reprocess_task(
+        kb_id=kb_id,
+        doc_id=doc_id,
+        user_id=user_id
+    )
+
+    if not success_flag:
+        return server_error(error)
+
+    logger.info(f"用户 {user_id} 提交文档重处理任务: {doc_id}")
+
+    return success(
+        data={"id": doc_id, "status": "processing"},
+        message="重处理任务已提交"
+    )
