@@ -9,6 +9,9 @@ from flask import Blueprint, request
 from app.services.document_service import doc_service
 from app.services.storage import get_storage_provider
 from app.services.document_processor import document_processor
+from app.services.vector_store.factory import get_vector_store
+from app.services.settings_service import settings_service
+from app.services.embedding.factory import get_embedding
 from app.util.auth import login_required, get_current_user_id
 from app.util.response import success, bad_request, not_found, server_error
 from app.util.file_validator import validate_document_file, sanitize_filename
@@ -363,3 +366,142 @@ def reprocess_document(kb_id, doc_id):
         data={"id": doc_id, "status": "processing"},
         message="重处理任务已提交"
     )
+
+
+@doc_bp.route("/<kb_id>/documents/<doc_id>/chunks", methods=["GET"])
+@login_required
+def get_document_chunks(kb_id, doc_id):
+    """
+    获取文档分块列表
+
+    支持分页和语义搜索。
+
+    Path Params:
+        kb_id: 知识库 ID
+        doc_id: 文档 ID
+
+    Query Params:
+        page: 页码（默认 1）
+        page_size: 每页数量（默认 15，最大 50）
+        query: 搜索文本（可选，提供时进行语义搜索）
+
+    Response:
+        成功: {
+            "code": 200,
+            "data": {
+                "items": [...],
+                "page": 1,
+                "page_size": 15,
+                "total": 30,
+                "is_search": false,
+                "doc_updated_at": "2024-03-01 10:00:00"
+            }
+        }
+    """
+    # 1. 校验 ID 格式
+    if not is_valid_id(kb_id) or not is_valid_id(doc_id):
+        return bad_request("无效的 ID 格式")
+
+    # 2. 获取分页参数
+    try:
+        page = int(request.args.get("page", 1))
+        page_size = int(request.args.get("page_size", 15))
+    except ValueError:
+        return bad_request("分页参数必须为整数")
+
+    # 参数边界检查
+    if page < 1:
+        page = 1
+    if page_size < 1:
+        page_size = 15
+    if page_size > 50:
+        page_size = 50
+
+    # 3. 获取搜索参数
+    query_text = request.args.get("query", "").strip()
+    is_search = bool(query_text)
+
+    # 4. 验证文档存在且用户有权限
+    user_id = get_current_user_id()
+    doc_data, error = doc_service.get_by_id(
+        kb_id=kb_id,
+        doc_id=doc_id,
+        user_id=user_id
+    )
+    if error:
+        return not_found(error)
+
+    # 5. 检查文档状态（只有已完成的文档才能查看分块）
+    if doc_data.get('status') != 'completed':
+        return bad_request("文档尚未处理完成，无法查看分块")
+
+    # 6. 获取向量存储
+    vector_store = get_vector_store()
+    collection_name = f"kb_{kb_id}"
+
+    # 检查 Collection 是否存在
+    if not vector_store.collection_exists(collection_name):
+        return success(data={
+            "items": [],
+            "page": page,
+            "page_size": page_size,
+            "total": 0,
+            "is_search": False,
+            "doc_updated_at": doc_data.get('updated_at')
+        })
+
+    # 7. 根据是否搜索，调用不同方法
+    if is_search:
+        # 语义搜索
+        # 7.1 获取用户配置
+        settings, _ = settings_service.get()
+        if not settings:
+            return server_error("获取用户配置失败")
+
+        # 7.2 获取 Embedding 实例并向量化查询文本
+        try:
+            embedding = get_embedding(settings)
+            query_vector = embedding.embed_query(query_text)
+        except Exception as e:
+            logger.error(f"查询向量化失败: {e}")
+            return server_error("查询处理失败")
+
+        # 7.3 搜索
+        chunks, error = vector_store.search_chunks_in_doc(
+            collection_name=collection_name,
+            query_vector=query_vector,
+            doc_id=doc_id,
+            top_k=page_size
+        )
+        if error:
+            return server_error(error)
+
+        # 搜索结果不分页，直接返回 top_k
+        return success(data={
+            "items": chunks,
+            "page": 1,
+            "page_size": len(chunks),
+            "total": len(chunks),
+            "is_search": True,
+            "doc_updated_at": doc_data.get('updated_at')
+        })
+
+    else:
+        # 普通分页查询
+        chunks, total, error = vector_store.get_chunks_by_doc_id(
+            collection_name=collection_name,
+            doc_id=doc_id,
+            page=page,
+            page_size=page_size
+        )
+        if error:
+            return server_error(error)
+
+        return success(data={
+            "items": chunks,
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "is_search": False,
+            "doc_updated_at": doc_data.get('updated_at')
+        })

@@ -112,3 +112,49 @@ class BaseVectorStore(ABC):
             结果列表中每个元素包含: {chunk, metadata, score}
         """
         pass
+
+    @abstractmethod
+    def get_chunks_by_doc_id(
+        self,
+        collection_name: str,
+        doc_id: str,
+        page: int = 1,
+        page_size: int = 15
+    ) -> Tuple[List[Dict[str, Any]], int, Optional[str]]:
+        """
+        获取文档的所有分块（分页）
+
+        Args:
+            collection_name: Collection 名称
+            doc_id: 文档 ID
+            page: 页码（从 1 开始）
+            page_size: 每页条数
+
+        Returns:
+            Tuple[List[Dict], int, Optional[str]]: (分块列表, 总数, 错误信息)
+            分块列表中每个元素包含: {id, content, seq}
+        """
+        pass
+
+    @abstractmethod
+    def search_chunks_in_doc(
+        self,
+        collection_name: str,
+        query_vector: List[float],
+        doc_id: str,
+        top_k: int = 50
+    ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+        """
+        在文档范围内进行语义搜索
+
+        Args:
+            collection_name: Collection 名称
+            query_vector: 查询向量
+            doc_id: 文档 ID（限定搜索范围）
+            top_k: 返回结果数量
+
+        Returns:
+            Tuple[List[Dict], Optional[str]]: (结果列表, 错误信息)
+            结果列表中每个元素包含: {id, content, seq, score}
+        """
+        pass

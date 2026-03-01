@@ -298,3 +298,114 @@ class MilvusVectorStore(BaseVectorStore):
             error = f"向量检索失败: {str(e)}"
             logger.error(error)
             return [], error
+
+    def get_chunks_by_doc_id(
+        self,
+        collection_name: str,
+        doc_id: str,
+        page: int = 1,
+        page_size: int = 15
+    ) -> Tuple[List[Dict[str, Any]], int, Optional[str]]:
+        """
+        获取文档的所有分块（分页）
+
+        Args:
+            collection_name: Collection 名称
+            doc_id: 文档 ID
+            page: 页码（从 1 开始）
+            page_size: 每页条数
+
+        Returns:
+            Tuple[List[Dict], int, Optional[str]]: (分块列表, 总数, 错误信息)
+        """
+        try:
+            collection = self._get_collection(collection_name)
+            if collection is None:
+                return [], 0, f"Collection 不存在: {collection_name}"
+
+            collection.load()
+
+            # 查询所有匹配的分块
+            results = collection.query(
+                expr=f'doc_id == "{doc_id}"',
+                output_fields=["id", "chunk"]
+            )
+
+            if not results:
+                return [], 0, None
+
+            total = len(results)
+
+            # 分页
+            start = (page - 1) * page_size
+            paginated_results = results[start:start + page_size]
+
+            items = []
+            for i, item in enumerate(paginated_results):
+                items.append({
+                    "id": item.get("id"),
+                    "content": item.get("chunk", ""),
+                    "seq": start + i + 1,  # 基于偏移量生成序号
+                })
+
+            logger.debug(f"获取分块完成: collection={collection_name}, doc_id={doc_id}, total={total}")
+            return items, total, None
+
+        except Exception as e:
+            error = f"获取分块失败: {str(e)}"
+            logger.error(error)
+            return [], 0, error
+
+    def search_chunks_in_doc(
+        self,
+        collection_name: str,
+        query_vector: List[float],
+        doc_id: str,
+        top_k: int = 50
+    ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+        """
+        在文档范围内进行语义搜索
+
+        Args:
+            collection_name: Collection 名称
+            query_vector: 查询向量
+            doc_id: 文档 ID（限定搜索范围）
+            top_k: 返回结果数量
+
+        Returns:
+            Tuple[List[Dict], Optional[str]]: (结果列表, 错误信息)
+        """
+        try:
+            collection = self._get_collection(collection_name)
+            if collection is None:
+                return [], f"Collection 不存在: {collection_name}"
+
+            collection.load()
+
+            search_params = {"metric_type": "COSINE", "params": {"nprobe": 10}}
+            results = collection.search(
+                data=[query_vector],
+                anns_field="embedding",
+                param=search_params,
+                limit=top_k,
+                expr=f'doc_id == "{doc_id}"',
+                output_fields=["chunk"]
+            )
+
+            items = []
+            for hits in results:
+                for i, hit in enumerate(hits):
+                    items.append({
+                        "id": hit.id,
+                        "content": hit.entity.get("chunk", ""),
+                        "seq": i + 1,  # 搜索结果的序号基于排序位置
+                        "score": hit.score,
+                    })
+
+            logger.debug(f"文档内搜索完成: collection={collection_name}, doc_id={doc_id}, results={len(items)}")
+            return items, None
+
+        except Exception as e:
+            error = f"搜索分块失败: {str(e)}"
+            logger.error(error)
+            return [], error

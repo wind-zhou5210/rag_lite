@@ -189,6 +189,10 @@ class DocumentProcessor:
             vector_store = get_vector_store()
             collection_name = f"kb_{kb_id}"
 
+            # 7.1 先删除该文档的旧向量数据，防止重复
+            vector_store.delete_by_doc_id(collection_name, doc_id)
+            logger.info(f"已清理文档旧向量数据: doc_id={doc_id}")
+
             if not vector_store.collection_exists(collection_name):
                 success, error = vector_store.create_collection(collection_name, dimension)
                 if not success:
