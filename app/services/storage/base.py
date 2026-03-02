@@ -73,15 +73,30 @@ class BaseStorageProvider(ABC):
     def exists(self, object_key: str) -> bool:
         """
         检查文件是否存在
-        
+
         Args:
             object_key: 文件的唯一标识
-        
+
         Returns:
             bool: 文件是否存在
         """
         pass
-    
+
+    def get_file_path(self, object_key: str) -> Optional[str]:
+        """
+        获取文件的本地路径
+
+        对于本地存储，直接返回本地路径；对于对象存储，需要下载到临时目录。
+
+        Args:
+            object_key: 文件的唯一标识
+
+        Returns:
+            Optional[str]: 文件本地路径，获取失败返回 None
+        """
+        # 默认实现：不支持，子类可以覆盖
+        return None
+
     def generate_object_key(self, filename: str, biz_type: str = "default") -> str:
         """
         生成唯一的 object_key
