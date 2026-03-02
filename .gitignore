@@ -39,3 +39,4 @@ uploads/
 .pytest_cache/
 .coverage
 htmlcov/
+.omc/

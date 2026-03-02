@@ -252,3 +252,131 @@ def delete_document(kb_id, doc_id):
     logger.info(f"用户 {user_id} 删除文档: {doc_id}")
 
     return success(message="删除成功")
+
+
+@doc_bp.route("/<kb_id>/documents/<doc_id>/process", methods=["POST"])
+@login_required
+def process_document(kb_id, doc_id):
+    """
+    处理文档（分块、向量化）
+
+    Path Params:
+        kb_id: 知识库 ID
+        doc_id: 文档 ID
+
+    Response:
+        成功: { "code": 202, "message": "处理任务已提交", "data": { "doc_id": "...", "status": "processing" } }
+        冲突: { "code": 409, "message": "文档正在处理中" }
+        失败: { "code": 404, "message": "文档不存在" }
+    """
+    from flask import make_response, jsonify
+    from app.services.document_processor import doc_processor
+    
+    # 校验 ID 格式
+    if not is_valid_id(kb_id) or not is_valid_id(doc_id):
+        return bad_request("无效的 ID 格式")
+
+    # 获取当前用户 ID
+    user_id = get_current_user_id()
+
+    # 提交处理任务
+    ok, error = doc_processor.process_async(kb_id, doc_id, user_id)
+
+    if not ok:
+        if "不存在" in error or "无权" in error:
+            return not_found(error)
+        if "正在处理" in error:
+            # 返回 409 Conflict
+            response = make_response(jsonify({
+                "code": 409,
+                "message": error
+            }), 409)
+            return response
+        return server_error(error)
+
+    logger.info(f"用户 {user_id} 提交文档处理任务: {doc_id}")
+
+    # 返回 202 Accepted
+    response = make_response(jsonify({
+        "code": 202,
+        "message": "处理任务已提交",
+        "data": {
+            "doc_id": doc_id,
+            "status": "processing"
+        }
+    }), 202)
+    return response
+
+
+@doc_bp.route("/<kb_id>/documents/<doc_id>/chunks", methods=["GET"])
+@login_required
+def get_document_chunks(kb_id, doc_id):
+    """
+    获取文档分块列表
+
+    Path Params:
+        kb_id: 知识库 ID
+        doc_id: 文档 ID
+
+    Query Params:
+        page: 页码（默认 1）
+        page_size: 每页数量（默认 20，最大 100）
+
+    Response:
+        成功: { "code": 200, "data": { "items": [...], "page": 1, "page_size": 20, "total": 45 } }
+    """
+    from app.services.vectorstore import get_vector_store
+    from app.services.vectorstore.base import BaseVectorStore
+    
+    # 校验 ID 格式
+    if not is_valid_id(kb_id) or not is_valid_id(doc_id):
+        return bad_request("无效的 ID 格式")
+
+    # 获取分页参数
+    try:
+        page = int(request.args.get("page", 1))
+        page_size = int(request.args.get("page_size", 20))
+    except ValueError:
+        return bad_request("分页参数必须为整数")
+
+    # 参数边界检查
+    if page < 1:
+        page = 1
+    if page_size < 1:
+        page_size = 20
+    if page_size > 100:
+        page_size = 100
+
+    # 获取当前用户 ID
+    user_id = get_current_user_id()
+
+    # 验证用户对该知识库的访问权限
+    doc_data, error = doc_service.get_by_id(kb_id, doc_id, user_id)
+    if error:
+        return not_found(error)
+
+    try:
+        # 从向量数据库获取分块
+        vector_store = get_vector_store()
+        collection_name = BaseVectorStore.generate_collection_name(kb_id)
+        
+        chunks, total = vector_store.get_chunks_by_doc_id(
+            collection_name=collection_name,
+            doc_id=doc_id,
+            page=page,
+            page_size=page_size
+        )
+
+        result = {
+            "items": chunks,
+            "page": page,
+            "page_size": page_size,
+            "total": total
+        }
+
+        return success(data=result)
+
+    except Exception as e:
+        logger.error(f"获取分块列表失败: {e}")
+        return server_error("获取分块列表失败")
+

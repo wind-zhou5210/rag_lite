@@ -20,11 +20,14 @@ dependencies = [
     "langchain-chroma>=1.1.0",
     "langchain-huggingface>=1.2.0",
     "langchain-deepseek>=1.0.1",
+    "langchain-text-splitters>=0.3.8",
     "minio>=7.2.20",
     "langchain-milvus>=0.3.3",
     "docx2txt>=0.9",
+    "python-docx>=1.1.0",
     "pypdf>=6.6.0",
     "sentence-transformers>=5.2.0",
+    "chromadb>=0.5.0",
 ]
 
 [project.optional-dependencies]
