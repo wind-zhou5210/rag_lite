@@ -30,17 +30,17 @@ RAG Lite 是一个轻量级的 RAG（检索增强生成）系统，基于 Flask 
 # 安装依赖（推荐使用 uv）
 uv sync
 
-# 运行开发服务器
-python main.py
+# 运行开发服务器（推荐使用 uv）
+uv run python main.py
 
 # 或使用 flask 命令
-flask run --host=0.0.0.0 --port=5000
+uv run flask run --host=0.0.0.0 --port=5001
 
 # 运行测试
-pytest
+uv run pytest
 
 # 运行单个测试文件
-pytest tests/test_example.py
+uv run pytest tests/test_example.py
 ```
 
 ## 环境配置
